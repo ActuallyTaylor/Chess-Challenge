@@ -23,7 +23,7 @@ public class MyBot : IChessBot
             }
             board.UndoMove(move);
         }
-        //Console.Write("Best Eval ({0}) - Best Move ({1}, {2} -> {3})\n", bestEval, bestMove, board.GetPiece(bestMove.StartSquare), board.GetPiece(bestMove.TargetSquare));
+        Console.Write("Best Eval ({0}) - Best Move ({1}, {2} -> {3})\n", bestEval, bestMove, board.GetPiece(bestMove.StartSquare), board.GetPiece(bestMove.TargetSquare));
 
         return bestMove;
     }
@@ -48,8 +48,9 @@ public class MyBot : IChessBot
             {
                 board.MakeMove(move);
                 int eval = minimax(board, depth - 1, alpha, beta, false);
-                maxEval = Math.Max(maxEval, eval);
                 board.UndoMove(move);
+                maxEval = Math.Max(maxEval, eval);
+                alpha = Math.Max(alpha, eval);
 
                 if (beta <= alpha)
                 {
@@ -57,15 +58,17 @@ public class MyBot : IChessBot
                 }
             }
             return maxEval;
-        } else
+        }
+        else
         {
             int minEval = int.MaxValue;
             foreach (Move move in moves)
             {
                 board.MakeMove(move);
                 int eval = minimax(board, depth - 1, alpha, beta, true);
-                minEval = Math.Min(minEval, eval);
                 board.UndoMove(move);
+                minEval = Math.Min(minEval, eval);
+                beta = Math.Min(beta, eval);
 
                 if (beta <= alpha)
                 {
@@ -92,7 +95,7 @@ public class MyBot : IChessBot
     private int countBoard(Board board, bool isWhite)
     {
         int value = 0;
-                
+
         foreach (PieceList pieceList in board.GetAllPieceLists())
         {
             foreach (Piece piece in pieceList)
@@ -102,10 +105,10 @@ public class MyBot : IChessBot
                     continue;
                 }
 
-                value += pieceValues[(int) piece.PieceType];
+                value += pieceValues[(int)piece.PieceType];
             }
         }
 
         return value;
-   }
+    }
 }
