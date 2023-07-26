@@ -39,44 +39,33 @@ public class MyBot : IChessBot
             return evaluate(board);
         }
 
-        Move[] moves = board.GetLegalMoves();
 
-        if (maximizingPlayer)
+        int score = maximizingPlayer ? int.MinValue : int.MaxValue;
+        foreach (Move move in board.GetLegalMoves())
         {
-            int maxEval = int.MinValue;
-            foreach (Move move in moves)
+            board.MakeMove(move);
+            int eval = minimax(board, depth - 1, alpha, beta, !maximizingPlayer);
+            board.UndoMove(move);
+
+            if (maximizingPlayer)
             {
-                board.MakeMove(move);
-                int eval = minimax(board, depth - 1, alpha, beta, false);
-                board.UndoMove(move);
-                maxEval = Math.Max(maxEval, eval);
+                score = Math.Max(score, eval);
                 alpha = Math.Max(alpha, eval);
-
-                if (beta <= alpha)
-                {
-                    break;
-                }
             }
-            return maxEval;
-        }
-        else
-        {
-            int minEval = int.MaxValue;
-            foreach (Move move in moves)
+            else
             {
-                board.MakeMove(move);
-                int eval = minimax(board, depth - 1, alpha, beta, true);
-                board.UndoMove(move);
-                minEval = Math.Min(minEval, eval);
+                score = Math.Min(score, eval);
                 beta = Math.Min(beta, eval);
-
-                if (beta <= alpha)
-                {
-                    break;
-                }
             }
-            return minEval;
+
+
+            if (beta <= alpha)
+            {
+                break;
+            }
         }
+
+        return score;
     }
 
 
