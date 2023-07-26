@@ -1,8 +1,5 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.ComponentModel;
-using System.Linq;
-using static System.Formats.Asn1.AsnWriter;
 
 public class MyBot : IChessBot
 {
@@ -12,58 +9,73 @@ public class MyBot : IChessBot
     {
         Move[] moves = board.GetLegalMoves();
 
-        Move? bestMove = null;
         int bestEval = int.MinValue;
-
-        foreach (Move move in moves)
-        {
-            int eval = search(board, 3);
-
-            if (eval > bestEval)
-            {
-                bestEval = eval;
-                bestMove = move;
-            }
-        }
-
-        return bestMove ?? moves[0];
-    }
-
-    private int search(Board board, int depth)
-    {
-        Move[] moves = board.GetLegalMoves();
-
-        if (depth == 0)
-        {
-            return evaluate(board);
-        }
-
-        int bestEval = int.MinValue;
+        Move bestMove = moves[0];
 
         foreach (Move move in moves)
         {
             board.MakeMove(move);
-            int eval = -search(board, depth - 1);
-            bestEval = Math.Max(bestEval, eval);
+            int eval = minimax(board, 3, int.MinValue, int.MaxValue, true);
+            if (eval >= bestEval)
+            {
+                bestEval = eval;
+                bestMove = move;
+            }
             board.UndoMove(move);
         }
+        //Console.Write("Best Eval ({0}) - Best Move ({1}, {2} -> {3})\n", bestEval, bestMove, board.GetPiece(bestMove.StartSquare), board.GetPiece(bestMove.TargetSquare));
 
-        return bestEval;
+        return bestMove;
     }
 
-    //private int HighestValueCapture(Board board, Move[] moves)
-    //{
-    //    int bestValue = int.MinValue;
+    private int minimax(Board board, int depth, int alpha, int beta, bool maximizingPlayer)
+    {
+        // Return static evaluation of the board if we are at the lowest depth
+        // or we have reached an end state
+        if (depth == 0 || board.IsDraw() || board.IsInCheck() ||
+            board.IsInCheckmate() || board.IsRepeatedPosition() ||
+            board.IsInsufficientMaterial())
+        {
+            return evaluate(board);
+        }
 
-    //    foreach (Move move in moves)
-    //    {
-    //        if (!move.IsCapture) { continue; }
-    //        Piece piece = board.GetPiece(move.TargetSquare);
-    //        bestValue = Math.Max(pieceValues[(int)piece.PieceType], bestValue);
-    //    }
+        Move[] moves = board.GetLegalMoves();
 
-    //    return bestValue;
-    //}
+        if (maximizingPlayer)
+        {
+            int maxEval = int.MinValue;
+            foreach (Move move in moves)
+            {
+                board.MakeMove(move);
+                int eval = minimax(board, depth - 1, alpha, beta, false);
+                maxEval = Math.Max(maxEval, eval);
+                board.UndoMove(move);
+
+                if (beta <= alpha)
+                {
+                    break;
+                }
+            }
+            return maxEval;
+        } else
+        {
+            int minEval = int.MaxValue;
+            foreach (Move move in moves)
+            {
+                board.MakeMove(move);
+                int eval = minimax(board, depth - 1, alpha, beta, true);
+                minEval = Math.Min(minEval, eval);
+                board.UndoMove(move);
+
+                if (beta <= alpha)
+                {
+                    break;
+                }
+            }
+            return minEval;
+        }
+    }
+
 
     // Evaluate the board and return a value based on the current pieces in play.
     private int evaluate(Board board)
@@ -73,9 +85,10 @@ public class MyBot : IChessBot
 
         int evaluation = whiteEval - blackEval;
 
-        return evaluation * (board.IsWhiteToMove ? -1 : 1);
+        return evaluation * (board.IsWhiteToMove ? 1 : -1);
     }
 
+    // Count all of hte pieces on the board.
     private int countBoard(Board board, bool isWhite)
     {
         int value = 0;
@@ -95,5 +108,4 @@ public class MyBot : IChessBot
 
         return value;
    }
-
 }
