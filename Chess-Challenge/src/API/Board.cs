@@ -276,11 +276,19 @@ namespace ChessChallenge.API
 			return BitboardHelper.SquareIsSet(moveGen.GetOpponentAttackMap(board), square);
 		}
 
+        /// <summary>
+        /// Is the given square attacked by the opponent?
+        /// (opponent being whichever player doesn't currently have the right to move)
+        /// </summary>
+        public ulong GetOpponentAttackMap() {
+			return moveGen.GetOpponentAttackMap(board);
+        }
 
-		/// <summary>
-		/// FEN representation of the current position
-		/// </summary>
-		public string GetFenString() => FenUtility.CurrentFen(board);
+
+        /// <summary>
+        /// FEN representation of the current position
+        /// </summary>
+        public string GetFenString() => FenUtility.CurrentFen(board);
 
         /// <summary>
         /// 64-bit number where each bit that is set to 1 represents a

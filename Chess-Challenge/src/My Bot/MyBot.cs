@@ -2,15 +2,15 @@
 // played chess. So this is a mess
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using ChessChallenge.API;
 
 public class MyBot : IChessBot {
+    static int negativeInfinity = -999999;
+    static int positiveInfinity = 999999;
     int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
 
     public Move Think(Board board, Timer timer) {
+        //Console.WriteLine("Current Board Eval: {0}", evaluate(board));
         // Negamax Root
         int bestEval = int.MinValue;
 
@@ -19,10 +19,10 @@ public class MyBot : IChessBot {
 
         foreach( Move move in moves ) {
             board.MakeMove(move);
-            int eval = -negamax(board, int.MinValue, int.MaxValue, 5);
+            int eval = -negamax(board, negativeInfinity, positiveInfinity, 2);
             board.UndoMove(move);
 
-            if( eval >= bestEval ) {
+            if( eval > bestEval ) {
                 bestEval = eval;
                 bestMove = move;
             }
@@ -32,27 +32,27 @@ public class MyBot : IChessBot {
         return bestMove;
     }
 
+    ///A negamax implementation derived from the following sources
+    /// https://en.wikipedia.org/wiki/Negamax
+    /// https://www.chessprogramming.org/Negamax
     private int negamax(Board board, int alpha, int beta, int depth) {
-        if( depth == 0 || board.IsDraw() || board.IsInCheck() ||
-            board.IsInCheckmate() || board.IsRepeatedPosition() ||
-            board.IsInsufficientMaterial() ) {
+        if( depth == 0 || board.IsDraw() ||board.IsInCheckmate() ) {
             return evaluate(board);
         }
 
+        int value = negativeInfinity;
         foreach( Move move in getOrderedMoves(board)) {
             board.MakeMove(move);
-            int score = -negamax(board, -beta, -alpha, depth - 1);
+            value = Math.Max(value, -negamax(board, -beta, -alpha, depth - 1));
             board.UndoMove(move);
+            alpha = Math.Max(alpha, value);
 
-            if( score >= beta ) {
-                return beta;
-            }
-            if( score > alpha ) {
-                alpha = score;
+            if( alpha >= beta ) {
+                break; // Prune this branch, we don't need to search any more nodes.
             }
         }
 
-        return alpha;
+        return value;
     }
 
     private int quiesceSearch(Board board, int alpha, int beta) {
@@ -136,16 +136,14 @@ public class MyBot : IChessBot {
         foreach( PieceList pieceList in board.GetAllPieceLists() ) {
             foreach( Piece piece in pieceList ) {
                 if( piece.IsWhite != isWhite ) {
-                    // Evaluate if the enemy is attacking any of our pieces
-                    
-                    continue; // Skip. Don't add the general points
+                    continue; // This piece is not our color. Skip it.
                 }
 
                 value += pieceValues[( int ) piece.PieceType];
             }
         }
 
-        return value;
+       return value;
     }
 }
 
