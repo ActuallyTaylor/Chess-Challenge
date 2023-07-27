@@ -9,12 +9,12 @@ public class MyBot : IChessBot {
     static int positiveInfinity = 999999;
     // 0) None (0)
     // 1) Pawn (100)
-    // 2) Knight (300)
-    // 3) Bishop (300)
+    // 2) Knight (325)
+    // 3) Bishop (350)
     // 4) Rook (500)
     // 5) Queen (900)
     // 6) King (10000)
-    int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+    int[] pieceValues = { 0, 100, 325, 350, 500, 900, 10000 };
 
     public Move Think(Board board, Timer timer) {
         //Console.WriteLine("Current Board Eval: {0}", evaluate(board));
@@ -43,12 +43,12 @@ public class MyBot : IChessBot {
     /// https://en.wikipedia.org/wiki/Negamax
     /// https://www.chessprogramming.org/Negamax
     private int negamax(Board board, int alpha, int beta, int depth) {
-        if( depth == 0 || board.IsDraw() ||board.IsInCheckmate() ) {
+        if( depth == 0 || board.IsDraw() || board.IsInCheckmate() ) {
             return quiesceSearch(board, alpha, beta);
         }
 
         int value = negativeInfinity;
-        foreach( Move move in getOrderedMoves(board)) {
+        foreach( Move move in getOrderedMoves(board) ) {
             board.MakeMove(move);
             value = Math.Max(value, -negamax(board, -beta, -alpha, depth - 1));
             board.UndoMove(move);
@@ -64,23 +64,23 @@ public class MyBot : IChessBot {
 
     private int quiesceSearch(Board board, int alpha, int beta) {
         int standPat = evaluate(board);
-        if ( standPat >= beta) {
+        if( standPat >= beta ) {
             return beta;
         }
-        if (alpha < standPat ) {
+        if( alpha < standPat ) {
             alpha = standPat;
         }
 
         Move[] captures = getOrderedMoves(board, true);
-        foreach(Move capture in captures) {
+        foreach( Move capture in captures ) {
             board.MakeMove(capture);
             int score = -quiesceSearch(board, -beta, -alpha);
             board.UndoMove(capture);
 
-            if (score >= beta) {
+            if( score >= beta ) {
                 return beta;
             }
-            if (score > alpha) {
+            if( score > alpha ) {
                 alpha = score;
             }
         }
@@ -99,16 +99,16 @@ public class MyBot : IChessBot {
             Piece capturePiece = board.GetPiece(move.TargetSquare);
 
             // Prioritise captures based on the value of the captured piece.
-            if( move.IsCapture && !capturePiece.IsNull) {
+            if( move.IsCapture && !capturePiece.IsNull ) {
                 moveScore += 10 * pieceValues[(int) capturePiece.PieceType];
             }
             // Prioritise moving to a promotion
-            if( move.IsPromotion) {
-                moveScore += pieceValues[( int ) move.PromotionPieceType];
+            if( move.IsPromotion ) {
+                moveScore += pieceValues[(int) move.PromotionPieceType];
             }
             //// Penalize moving into sqaures that are attacked by the opponent.
             if( board.SquareIsAttackedByOpponent(move.TargetSquare) ) {
-                moveScore -= pieceValues[(int) movingPiece.PieceType];
+                moveScore -= 5 * pieceValues[(int) movingPiece.PieceType];
             }
             //// Prioritise moving out of the way of attacks
             if( board.SquareIsAttackedByOpponent(move.StartSquare) ) {
@@ -147,7 +147,7 @@ public class MyBot : IChessBot {
                     continue; // This piece is not our color. Skip it.
                 }
                 bishopCount += piece.IsBishop ? 1 : 0;
-                value += pieceValues[( int ) piece.PieceType];
+                value += pieceValues[(int) piece.PieceType];
             }
         }
 
@@ -155,7 +155,11 @@ public class MyBot : IChessBot {
         // https://www.chessprogramming.org/Bishop_Pair
         value += bishopCount >= 2 ? ( pieceValues[1] / 2 ) : 0;
 
-       return value;
+        // Add a penalty if we end up in check
+        value -= board.IsInCheck() ? 10000 : 0;
+
+
+        return value;
     }
 }
 
