@@ -1,100 +1,69 @@
-﻿using ChessChallenge.API;
+﻿// I have not written C# in any capacity in years. I have also barely ever
+// played chess. So this is a mess
+
+using ChessChallenge.API;
 using System;
 
-public class MyBot : IChessBot
-{
+public class MyBot : IChessBot {
     int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
 
-    public Move Think(Board board, Timer timer)
-    {
-        Move[] moves = board.GetLegalMoves();
-
+    public Move Think(Board board, Timer timer) {
+        // Negamax Root
         int bestEval = int.MinValue;
+
+        Move[] moves = board.GetLegalMoves();
         Move bestMove = moves[0];
 
-        foreach (Move move in moves)
-        {
+        foreach( Move move in moves ) {
             board.MakeMove(move);
-            int eval = minimax(board, 3, int.MinValue, int.MaxValue, true);
-            if (eval >= bestEval)
-            {
+            int eval = -negamax(board, 3);//, int.MinValue, int.MaxValue, true);
+            if( eval >= bestEval ) {
                 bestEval = eval;
                 bestMove = move;
             }
             board.UndoMove(move);
         }
-        Console.Write("Best Eval ({0}) - Best Move ({1}, {2} -> {3})\n", bestEval, bestMove, board.GetPiece(bestMove.StartSquare), board.GetPiece(bestMove.TargetSquare));
+        // End Negamax Root
 
         return bestMove;
     }
 
-    private int minimax(Board board, int depth, int alpha, int beta, bool maximizingPlayer)
-    {
-        // Return static evaluation of the board if we are at the lowest depth
-        // or we have reached an end state
-        if (depth == 0 || board.IsDraw() || board.IsInCheck() ||
-            board.IsInCheckmate() || board.IsRepeatedPosition() ||
-            board.IsInsufficientMaterial())
-        {
+    private int negamax(Board board, int depth) {
+        if( depth == 0 ) {
             return evaluate(board);
         }
-
-
-        int score = maximizingPlayer ? int.MinValue : int.MaxValue;
-        foreach (Move move in board.GetLegalMoves())
-        {
+        int max = int.MinValue;
+        foreach( Move move in board.GetLegalMoves() ) {
             board.MakeMove(move);
-            int eval = minimax(board, depth - 1, alpha, beta, !maximizingPlayer);
+            int score = -negamax(board, depth - 1);
             board.UndoMove(move);
-
-            if (maximizingPlayer)
-            {
-                score = Math.Max(score, eval);
-                alpha = Math.Max(alpha, eval);
-            }
-            else
-            {
-                score = Math.Min(score, eval);
-                beta = Math.Min(beta, eval);
-            }
-
-
-            if (beta <= alpha)
-            {
-                break;
-            }
+            max = Math.Max(score, max);
         }
 
-        return score;
+        return max;
     }
 
-
     // Evaluate the board and return a value based on the current pieces in play.
-    private int evaluate(Board board)
-    {
+    private int evaluate(Board board) {
         int whiteEval = countBoard(board, true);
         int blackEval = countBoard(board, false);
 
         int evaluation = whiteEval - blackEval;
 
-        return evaluation * (board.IsWhiteToMove ? 1 : -1);
+        return evaluation * ( board.IsWhiteToMove ? 1 : -1 );
     }
 
     // Count all of hte pieces on the board.
-    private int countBoard(Board board, bool isWhite)
-    {
+    private int countBoard(Board board, bool isWhite) {
         int value = 0;
 
-        foreach (PieceList pieceList in board.GetAllPieceLists())
-        {
-            foreach (Piece piece in pieceList)
-            {
-                if (piece.IsWhite != isWhite)
-                {
+        foreach( PieceList pieceList in board.GetAllPieceLists() ) {
+            foreach( Piece piece in pieceList ) {
+                if( piece.IsWhite != isWhite ) {
                     continue;
                 }
 
-                value += pieceValues[(int)piece.PieceType];
+                value += pieceValues[( int ) piece.PieceType];
             }
         }
 
