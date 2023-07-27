@@ -2,7 +2,6 @@
 // played chess. So this is a mess
 
 using ChessChallenge.API;
-using System;
 
 public class MyBot : IChessBot {
     int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
@@ -16,7 +15,7 @@ public class MyBot : IChessBot {
 
         foreach( Move move in moves ) {
             board.MakeMove(move);
-            int eval = -negamax(board, 3);//, int.MinValue, int.MaxValue, true);
+            int eval = -negamax(board, int.MinValue, int.MaxValue, 3);
             if( eval >= bestEval ) {
                 bestEval = eval;
                 bestMove = move;
@@ -28,19 +27,25 @@ public class MyBot : IChessBot {
         return bestMove;
     }
 
-    private int negamax(Board board, int depth) {
+    private int negamax(Board board, int alpha, int beta, int depth) {
         if( depth == 0 ) {
             return evaluate(board);
         }
-        int max = int.MinValue;
+
         foreach( Move move in board.GetLegalMoves() ) {
             board.MakeMove(move);
-            int score = -negamax(board, depth - 1);
+            int score = -negamax(board, -beta, -alpha, depth - 1);
             board.UndoMove(move);
-            max = Math.Max(score, max);
+
+            if( score >= beta ) {
+                return beta;
+            }
+            if( score > alpha ) {
+                alpha = score;
+            }
         }
 
-        return max;
+        return alpha;
     }
 
     // Evaluate the board and return a value based on the current pieces in play.
