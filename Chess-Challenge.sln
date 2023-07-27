@@ -51,7 +51,6 @@ Global
 		$2.NewLineForClausesInQuery = False
 		$2.SpaceAfterControlFlowStatementKeyword = False
 		$2.SpaceWithinExpressionParentheses = True
-		$2.SpaceWithinCastParentheses = True
 		$2.SpaceWithinOtherParentheses = True
 		$2.SpaceAfterCast = True
 		$2.WrappingKeepStatementsOnSingleLine = False
