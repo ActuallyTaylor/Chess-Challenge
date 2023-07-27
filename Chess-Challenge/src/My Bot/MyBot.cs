@@ -7,6 +7,13 @@ using ChessChallenge.API;
 public class MyBot : IChessBot {
     static int negativeInfinity = -999999;
     static int positiveInfinity = 999999;
+    // 0) None (0)
+    // 1) Pawn (100)
+    // 2) Knight (300)
+    // 3) Bishop (300)
+    // 4) Rook (500)
+    // 5) Queen (900)
+    // 6) King (10000)
     int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
 
     public Move Think(Board board, Timer timer) {
@@ -37,7 +44,7 @@ public class MyBot : IChessBot {
     /// https://www.chessprogramming.org/Negamax
     private int negamax(Board board, int alpha, int beta, int depth) {
         if( depth == 0 || board.IsDraw() ||board.IsInCheckmate() ) {
-            return evaluate(board);
+            return quiesceSearch(board, alpha, beta);
         }
 
         int value = negativeInfinity;
@@ -56,12 +63,12 @@ public class MyBot : IChessBot {
     }
 
     private int quiesceSearch(Board board, int alpha, int beta) {
-        int eval = evaluate(board);
-        if ( eval >= beta) {
+        int standPat = evaluate(board);
+        if ( standPat >= beta) {
             return beta;
         }
-        if (alpha < eval ) {
-            alpha = eval;
+        if (alpha < standPat ) {
+            alpha = standPat;
         }
 
         Move[] captures = getOrderedMoves(board, true);
@@ -129,19 +136,24 @@ public class MyBot : IChessBot {
         return evaluation * ( board.IsWhiteToMove ? 1 : -1 );
     }
 
-    // Count all of hte pieces on the board.
+    // Count all of the pieces on the board.
     private int countBoard(Board board, bool isWhite) {
         int value = 0;
+        int bishopCount = 0;
 
         foreach( PieceList pieceList in board.GetAllPieceLists() ) {
             foreach( Piece piece in pieceList ) {
                 if( piece.IsWhite != isWhite ) {
                     continue; // This piece is not our color. Skip it.
                 }
-
+                bishopCount += piece.IsBishop ? 1 : 0;
                 value += pieceValues[( int ) piece.PieceType];
             }
         }
+
+        // Add a bonus for the bishop pair advantage
+        // https://www.chessprogramming.org/Bishop_Pair
+        value += bishopCount >= 2 ? ( pieceValues[1] / 2 ) : 0;
 
        return value;
     }
