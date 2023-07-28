@@ -7,6 +7,7 @@ using System.Collections.Generic;
 
 public class MyBot : IChessBot {
     public const int INFINITY = 999999;
+    public const int MAX_DEPTH = 5;
 
     // 0) None (0)
     // 1) Pawn (100)
@@ -15,20 +16,19 @@ public class MyBot : IChessBot {
     // 4) Rook (500)
     // 5) Queen (900)
     // 6) King (10000)
-    int[] pieceValues = { 0, 100, 325, 350, 500, 900, 10000 };
+    public static int[] pieceValues = { 0, 100, 325, 350, 500, 900, 10000 };
     static Dictionary<ulong, int> transpositionTable = new Dictionary<ulong, int>();
 
     public Move Think(Board board, Timer timer) {
-        //Console.WriteLine("Current Board Eval: {0}", evaluate(board));
         // Negamax Root
-        int bestEval = int.MinValue;
+        int bestEval = -INFINITY;
 
         Move[] moves = getOrderedMoves(board);
         Move bestMove = moves[0];
 
         foreach( Move move in moves ) {
             board.MakeMove(move);
-            int eval = -negamax(board, -INFINITY, INFINITY, 10);
+            int eval = -negamax(board, -INFINITY, INFINITY, 0);
             board.UndoMove(move);
 
             if( eval > bestEval ) {
@@ -45,7 +45,7 @@ public class MyBot : IChessBot {
     /// https://en.wikipedia.org/wiki/Negamax
     /// https://www.chessprogramming.org/Negamax
     private int negamax(Board board, int alpha, int beta, int depth) {
-        if( depth == 0 || board.IsDraw() || board.IsInCheckmate() ) {
+        if( depth >= MAX_DEPTH || board.IsInCheckmate() || board.IsInCheckmate() ) {
             return quiesceSearch(board, alpha, beta);
         }
 
@@ -55,7 +55,7 @@ public class MyBot : IChessBot {
             if( transpositionTable.ContainsKey(board.ZobristKey) ) {
                 value = transpositionTable[board.ZobristKey];
             } else {
-                value = Math.Max(value, -negamax(board, -beta, -alpha, depth - 1));
+                value = Math.Max(value, -negamax(board, -beta, -alpha, depth + 1));
                 transpositionTable[board.ZobristKey] = value;
             }
             board.UndoMove(move);
@@ -153,6 +153,11 @@ public class MyBot : IChessBot {
                 if( piece.IsWhite != isWhite ) {
                     continue; // This piece is not our color. Skip it.
                 }
+
+                if (board.IsWhiteToMove == isWhite && board.IsInCheck()) {
+                    value -= 10000;
+                }
+
                 bishopCount += piece.IsBishop ? 1 : 0;
                 value += pieceValues[(int) piece.PieceType];
             }

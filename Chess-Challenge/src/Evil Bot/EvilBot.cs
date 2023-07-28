@@ -2,6 +2,7 @@
 //#define UCI
 
 using System;
+using System.Collections.Generic;
 using ChessChallenge.API;
 
 namespace ChessChallenge.Example
@@ -9,22 +10,32 @@ namespace ChessChallenge.Example
     // A simple bot that can spot mate in one, and always captures the most valuable piece it can.
     // Plays randomly otherwise.
     public class EvilBot : IChessBot {
-        int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+        public const int INFINITY = 999999;
+        public const int MAX_DEPTH = 5;
+
+        // 0) None (0)
+        // 1) Pawn (100)
+        // 2) Knight (325)
+        // 3) Bishop (350)
+        // 4) Rook (500)
+        // 5) Queen (900)
+        // 6) King (10000)
+        public static int[] pieceValues = { 0, 100, 325, 350, 500, 900, 10000 };
+        static Dictionary<ulong, int> transpositionTable = new Dictionary<ulong, int>();
 
         public Move Think(Board board, Timer timer) {
-            Console.WriteLine("Current Board Eval: {0}", evaluate(board));
             // Negamax Root
-            int bestEval = int.MinValue;
+            int bestEval = -INFINITY;
 
             Move[] moves = getOrderedMoves(board);
             Move bestMove = moves[0];
 
             foreach( Move move in moves ) {
                 board.MakeMove(move);
-                int eval = -negamax(board, int.MinValue, int.MaxValue, 5);
+                int eval = -negamax(board, -INFINITY, INFINITY, 0);
                 board.UndoMove(move);
 
-                if( eval >= bestEval ) {
+                if( eval > bestEval ) {
                     bestEval = eval;
                     bestMove = move;
                 }
@@ -34,34 +45,41 @@ namespace ChessChallenge.Example
             return bestMove;
         }
 
+        ///A negamax implementation derived from the following sources
+        /// https://en.wikipedia.org/wiki/Negamax
+        /// https://www.chessprogramming.org/Negamax
         private int negamax(Board board, int alpha, int beta, int depth) {
-            if( depth == 0 || board.IsDraw() || board.IsInCheckmate() ) {
-                return evaluate(board);
+            if( depth >= MAX_DEPTH || board.IsInCheckmate() ) {
+                return quiesceSearch(board, alpha, beta);
             }
 
+            int value = -INFINITY;
             foreach( Move move in getOrderedMoves(board) ) {
                 board.MakeMove(move);
-                int score = -negamax(board, -beta, -alpha, depth - 1);
-                board.UndoMove(move);
-
-                if( score >= beta ) {
-                    return beta;
+                if( transpositionTable.ContainsKey(board.ZobristKey) ) {
+                    value = transpositionTable[board.ZobristKey];
+                } else {
+                    value = Math.Max(value, -negamax(board, -beta, -alpha, depth + 1));
+                    transpositionTable[board.ZobristKey] = value;
                 }
-                if( score > alpha ) {
-                    alpha = score;
+                board.UndoMove(move);
+                alpha = Math.Max(alpha, value);
+
+                if( alpha >= beta ) {
+                    break; // Prune this branch, we don't need to search any more nodes.
                 }
             }
 
-            return alpha;
+            return value;
         }
 
         private int quiesceSearch(Board board, int alpha, int beta) {
-            int eval = evaluate(board);
-            if( eval >= beta ) {
+            int standPat = evaluate(board);
+            if( standPat >= beta ) {
                 return beta;
             }
-            if( alpha < eval ) {
-                alpha = eval;
+            if( alpha < standPat ) {
+                alpha = standPat;
             }
 
             Move[] captures = getOrderedMoves(board, true);
@@ -101,7 +119,7 @@ namespace ChessChallenge.Example
                 }
                 //// Penalize moving into sqaures that are attacked by the opponent.
                 if( board.SquareIsAttackedByOpponent(move.TargetSquare) ) {
-                    moveScore -= pieceValues[(int) movingPiece.PieceType];
+                    moveScore -= 5 * pieceValues[(int) movingPiece.PieceType];
                 }
                 //// Prioritise moving out of the way of attacks
                 if( board.SquareIsAttackedByOpponent(move.StartSquare) ) {
@@ -129,9 +147,10 @@ namespace ChessChallenge.Example
             return evaluation * ( board.IsWhiteToMove ? 1 : -1 );
         }
 
-        // Count all of hte pieces on the board.
+        // Count all of the pieces on the board.
         private int countBoard(Board board, bool isWhite) {
             int value = 0;
+            int bishopCount = 0;
 
             foreach( PieceList pieceList in board.GetAllPieceLists() ) {
                 foreach( Piece piece in pieceList ) {
@@ -139,29 +158,14 @@ namespace ChessChallenge.Example
                         continue; // This piece is not our color. Skip it.
                     }
 
-                    //bool skipped = false;
-                    //if( board.IsWhiteToMove != isWhite ) {
-                    //    skipped = true;
-                    //    board.ForceSkipTurn();
-                    //}
-
-                    //if( board.SquareIsAttackedByOpponent(piece.Square) ) {
-                    //    //BitboardHelper.VisualizeBitboard(board.GetOpponentAttackMap());
-                    //    //Console.WriteLine("Sqaure {0} attacked by opponent - Current Color: {1}", piece.Square, isWhite ? "White" : "Black");
-                    //    value -= 50;
-                    //}
-
-                    //if( skipped ) {
-                    //    board.UndoSkipTurn();
-                    //}
-
+                    bishopCount += piece.IsBishop ? 1 : 0;
                     value += pieceValues[(int) piece.PieceType];
                 }
             }
 
-            if( board.IsInCheck() ) {
-                value -= 1000;
-            }
+            // Add a bonus for the bishop pair advantage
+            // https://www.chessprogramming.org/Bishop_Pair
+            value += bishopCount >= 2 ? ( pieceValues[1] / 2 ) : 0;
 
             return value;
         }
