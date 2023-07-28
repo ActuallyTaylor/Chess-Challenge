@@ -3,10 +3,11 @@
 
 using System;
 using ChessChallenge.API;
+using System.Collections.Generic;
 
 public class MyBot : IChessBot {
-    static int negativeInfinity = -999999;
-    static int positiveInfinity = 999999;
+    public const int INFINITY = 999999;
+
     // 0) None (0)
     // 1) Pawn (100)
     // 2) Knight (325)
@@ -15,6 +16,7 @@ public class MyBot : IChessBot {
     // 5) Queen (900)
     // 6) King (10000)
     int[] pieceValues = { 0, 100, 325, 350, 500, 900, 10000 };
+    static Dictionary<ulong, int> transpositionTable = new Dictionary<ulong, int>();
 
     public Move Think(Board board, Timer timer) {
         //Console.WriteLine("Current Board Eval: {0}", evaluate(board));
@@ -26,7 +28,7 @@ public class MyBot : IChessBot {
 
         foreach( Move move in moves ) {
             board.MakeMove(move);
-            int eval = -negamax(board, negativeInfinity, positiveInfinity, 2);
+            int eval = -negamax(board, -INFINITY, INFINITY, 10);
             board.UndoMove(move);
 
             if( eval > bestEval ) {
@@ -47,10 +49,15 @@ public class MyBot : IChessBot {
             return quiesceSearch(board, alpha, beta);
         }
 
-        int value = negativeInfinity;
+        int value = -INFINITY;
         foreach( Move move in getOrderedMoves(board) ) {
             board.MakeMove(move);
-            value = Math.Max(value, -negamax(board, -beta, -alpha, depth - 1));
+            if( transpositionTable.ContainsKey(board.ZobristKey) ) {
+                value = transpositionTable[board.ZobristKey];
+            } else {
+                value = Math.Max(value, -negamax(board, -beta, -alpha, depth - 1));
+                transpositionTable[board.ZobristKey] = value;
+            }
             board.UndoMove(move);
             alpha = Math.Max(alpha, value);
 
@@ -154,10 +161,6 @@ public class MyBot : IChessBot {
         // Add a bonus for the bishop pair advantage
         // https://www.chessprogramming.org/Bishop_Pair
         value += bishopCount >= 2 ? ( pieceValues[1] / 2 ) : 0;
-
-        // Add a penalty if we end up in check
-        value -= board.IsInCheck() ? 10000 : 0;
-
 
         return value;
     }
