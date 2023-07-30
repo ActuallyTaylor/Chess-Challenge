@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 public class MyBot : IChessBot {
     public const int INFINITY = 999999;
-    public const int MAX_DEPTH = 5;
+    public const int MAX_DEPTH = 4;
 
     // 0) None (0)
     // 1) Pawn (100)
@@ -16,11 +16,13 @@ public class MyBot : IChessBot {
     // 4) Rook (500)
     // 5) Queen (900)
     // 6) King (10000)
-    public static int[] pieceValues = { 0, 100, 325, 350, 500, 900, 10000 };
+    public static int[] pieceValues = { 0, 100, 320, 330, 500, 900, 20000 };
     static Dictionary<ulong, int> transpositionTable = new Dictionary<ulong, int>();
 
+    int numberOfTicks = 0;
+    long total = 0;
+
     public Move Think(Board board, Timer timer) {
-        // Negamax Root
         int bestEval = -INFINITY;
 
         Move[] moves = getOrderedMoves(board);
@@ -28,15 +30,22 @@ public class MyBot : IChessBot {
 
         foreach( Move move in moves ) {
             board.MakeMove(move);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
             int eval = -negamax(board, -INFINITY, INFINITY, 0);
             board.UndoMove(move);
+
+            watch.Stop();
+            long ticks = watch.ElapsedMilliseconds;
+            total += ticks;
+            numberOfTicks += 1;
 
             if( eval > bestEval ) {
                 bestEval = eval;
                 bestMove = move;
             }
         }
-        // End Negamax Root
+
+        Console.WriteLine("Average Serach Time Per Move {0}ms - Total {1}ms", total / numberOfTicks, total);
 
         return bestMove;
     }
@@ -73,8 +82,7 @@ public class MyBot : IChessBot {
         int standPat = evaluate(board);
         if( standPat >= beta ) {
             return beta;
-        }
-        if( alpha < standPat ) {
+        } else if ( alpha < standPat ) {
             alpha = standPat;
         }
 
@@ -86,8 +94,7 @@ public class MyBot : IChessBot {
 
             if( score >= beta ) {
                 return beta;
-            }
-            if( score > alpha ) {
+            } else if( score > alpha ) {
                 alpha = score;
             }
         }
@@ -100,25 +107,24 @@ public class MyBot : IChessBot {
         int[] moveScores = new int[moves.Length];
 
         for( int i = 0; i < moves.Length; i++ ) {
-            Move move = moves[i];
             int moveScore = 0;
-            Piece movingPiece = board.GetPiece(move.StartSquare);
-            Piece capturePiece = board.GetPiece(move.TargetSquare);
+            Piece movingPiece = board.GetPiece(moves[i].StartSquare);
+            Piece capturePiece = board.GetPiece(moves[i].TargetSquare);
 
             // Prioritise captures based on the value of the captured piece.
-            if( move.IsCapture && !capturePiece.IsNull ) {
+            if( moves[i].IsCapture && !capturePiece.IsNull ) {
                 moveScore += 10 * pieceValues[(int) capturePiece.PieceType];
             }
             // Prioritise moving to a promotion
-            if( move.IsPromotion ) {
-                moveScore += pieceValues[(int) move.PromotionPieceType];
+            if( moves[i].IsPromotion ) {
+                moveScore += pieceValues[(int) moves[i].PromotionPieceType];
             }
             //// Penalize moving into sqaures that are attacked by the opponent.
-            if( board.SquareIsAttackedByOpponent(move.TargetSquare) ) {
+            if( board.SquareIsAttackedByOpponent(moves[i].TargetSquare) ) {
                 moveScore -= 5 * pieceValues[(int) movingPiece.PieceType];
             }
             //// Prioritise moving out of the way of attacks
-            if( board.SquareIsAttackedByOpponent(move.StartSquare) ) {
+            if( board.SquareIsAttackedByOpponent(moves[i].StartSquare) ) {
                 moveScore += pieceValues[(int) movingPiece.PieceType];
             }
 
@@ -140,32 +146,62 @@ public class MyBot : IChessBot {
 
         int evaluation = whiteEval - blackEval;
 
-        return evaluation * ( board.IsWhiteToMove ? 1 : -1 );
+        if (board.IsWhiteToMove) {
+            return evaluation;
+        } else {
+            return -evaluation;
+        }
     }
 
     // Count all of the pieces on the board.
     private int countBoard(Board board, bool isWhite) {
+        bool isWhiteToMove = board.IsWhiteToMove;
+        bool hasQueen = false;
         int value = 0;
         int bishopCount = 0;
 
         foreach( PieceList pieceList in board.GetAllPieceLists() ) {
             foreach( Piece piece in pieceList ) {
+                int rank = piece.Square.Rank;
+                int file = piece.Square.File;
+
                 if( piece.IsWhite != isWhite ) {
                     continue; // This piece is not our color. Skip it.
                 }
 
-                if (board.IsWhiteToMove == isWhite && board.IsInCheck()) {
-                    value -= 10000;
+                if( board.IsInCheck() ) {
+                    if( isWhiteToMove == isWhite ) {
+                        value -= 100000;
+                    } else {
+                        value += 100000;
+                    }
                 }
 
-                bishopCount += piece.IsBishop ? 1 : 0;
+                if( piece.IsBishop ) {
+                    bishopCount += 1;
+                }
+
+                /// https://www.chessprogramming.org/Simplified_Evaluation_Function
+                // Some sort of strategy to keep peices in the correct places.
+                // This functio nalone takes up a lot of time
+
+                if( ( rank == 0 || rank == 7 || file == 0 || file == 7 ) && !piece.IsPawn ) {
+                    value -= 10;
+                }
+
+                //if(hasQueen && piece.IsKing && ((rank > 1 && isWhiteToMove) || (rank < 6 && !isWhiteToMove)) ) {
+                //  value -= 40;
+                //}
+
                 value += pieceValues[(int) piece.PieceType];
             }
         }
 
         // Add a bonus for the bishop pair advantage
         // https://www.chessprogramming.org/Bishop_Pair
-        value += bishopCount >= 2 ? ( pieceValues[1] / 2 ) : 0;
+        if (bishopCount >= 2) {
+            value += pieceValues[1] / 2;
+        }
 
         return value;
     }
